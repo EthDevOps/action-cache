@@ -2,6 +2,17 @@
 
 A GitHub Action for caching dependencies and build outputs to S3-compatible storage (AWS S3, MinIO, etc.).
 
+## ⚠️ Important: For Ethereum Foundation Users
+
+**If you are part of the Ethereum Foundation**, please contact the **EthDevOps team** to obtain cache credentials before using this action.
+
+- 📧 Contact: `~devops` channel in Mattermost or create a ticket in `ethereum/devops`
+- 🔑 Required credentials: `CACHE_USERNAME` and `CACHE_PASSWORD`
+
+Do not attempt to configure your own S3 storage unless you have specific requirements outside of the EF infrastructure.
+
+---
+
 ## Features
 
 - 🚀 Fast caching to S3/MinIO
