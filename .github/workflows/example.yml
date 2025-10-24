@@ -1,0 +1,53 @@
+name: Example Workflow with S3 Cache
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+    branches: [main]
+
+jobs:
+  build:
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+
+      - name: Setup Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: '20'
+
+      # Restore cache from S3
+      - name: Restore cache
+        id: cache
+        uses: ./
+        with:
+          action: restore
+          key: ${{ runner.os }}-node-${{ hashFiles('**/package-lock.json') }}
+          restore-keys: |
+            ${{ runner.os }}-node-
+            ${{ runner.os }}-
+          path: node_modules
+          cache-username: ${{ secrets.CACHE_USERNAME }}
+          cache-password: ${{ secrets.CACHE_PASSWORD }}
+
+      # Only install dependencies if cache was not hit
+      - name: Install dependencies
+        if: steps.cache.outputs.cache-hit != 'true'
+        run: npm ci
+
+      - name: Build
+        run: npm run build
+
+      # Save cache to S3 (even if build fails, for debugging)
+      - name: Save cache
+        if: always()
+        uses: ./
+        with:
+          action: save
+          key: ${{ runner.os }}-node-${{ hashFiles('**/package-lock.json') }}
+          path: node_modules
+          cache-username: ${{ secrets.CACHE_USERNAME }}
+          cache-password: ${{ secrets.CACHE_PASSWORD }}

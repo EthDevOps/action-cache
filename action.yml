@@ -1,0 +1,49 @@
+name: 'S3 Cache'
+description: 'Cache dependencies and build outputs to S3/Minio'
+author: 'Your Organization'
+
+branding:
+  icon: 'archive'
+  color: 'blue'
+
+inputs:
+  action:
+    description: 'Action to perform: save or restore'
+    required: true
+  key:
+    description: 'Cache key to use for saving/restoring'
+    required: true
+  restore-keys:
+    description: 'Ordered list of fallback cache keys (newline-separated, for restore only)'
+    required: false
+  path:
+    description: 'Paths to cache (newline-separated or comma-separated)'
+    required: true
+  s3-endpoint:
+    description: 'S3 endpoint URL'
+    required: false
+    default: 'https://s3-dcl1.ethquokkaops.io'
+  cache-username:
+    description: 'Cache storage username (S3 access key ID)'
+    required: true
+  cache-password:
+    description: 'Cache storage password (S3 secret access key)'
+    required: true
+  s3-bucket:
+    description: 'S3 bucket name'
+    required: false
+    default: 'github-actions-cache'
+  s3-region:
+    description: 'S3 region'
+    required: false
+    default: 'us-east-1'
+
+outputs:
+  cache-hit:
+    description: 'Boolean indicating if an exact cache match was found (restore only)'
+  cache-key:
+    description: 'The cache key that was used'
+
+runs:
+  using: 'node20'
+  main: 'dist/index.js'
