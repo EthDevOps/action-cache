@@ -9,8 +9,9 @@ export declare function getTempDir(): string;
 /**
  * Create a tar archive from paths
  * Uses lz4 compression via tar's --use-compress-program option
+ * Returns the compression format used
  */
-export declare function createTarArchive(paths: string[], outputPath: string, workingDir?: string): Promise<void>;
+export declare function createTarArchive(paths: string[], outputPath: string, workingDir?: string): Promise<'lz4' | 'gzip'>;
 /**
  * Extract a tar archive
  */

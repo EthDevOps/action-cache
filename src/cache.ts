@@ -35,12 +35,13 @@ export function getTempDir(): string {
 /**
  * Create a tar archive from paths
  * Uses lz4 compression via tar's --use-compress-program option
+ * Returns the compression format used
  */
 export async function createTarArchive(
   paths: string[],
   outputPath: string,
   workingDir: string = process.cwd()
-): Promise<void> {
+): Promise<'lz4' | 'gzip'> {
   core.info(`Creating tar archive: ${outputPath}`);
   core.info(`Archiving ${paths.length} paths`);
 
@@ -51,11 +52,14 @@ export async function createTarArchive(
   try {
     // Use lz4 if available, otherwise fall back to gzip
     let compressionCmd = 'lz4 -c';
+    let compressionFormat: 'lz4' | 'gzip' = 'lz4';
     try {
       await exec.exec('which', ['lz4'], { silent: true });
+      core.info('Using lz4 compression');
     } catch {
-      core.warning('lz4 not found, falling back to gzip compression');
+      core.info('lz4 not found, using gzip compression');
       compressionCmd = 'gzip';
+      compressionFormat = 'gzip';
     }
 
     // Create tar archive with compression
@@ -83,12 +87,44 @@ export async function createTarArchive(
 
     const stats = fs.statSync(outputPath);
     core.info(`Archive created: ${(stats.size / 1024 / 1024).toFixed(2)} MB`);
+    core.info(`Compression format: ${compressionFormat}`);
+
+    return compressionFormat;
   } finally {
     // Clean up file list
     if (fs.existsSync(fileListPath)) {
       fs.unlinkSync(fileListPath);
     }
   }
+}
+
+/**
+ * Detect compression format from file magic bytes
+ */
+function detectCompressionFormat(filePath: string): 'lz4' | 'gzip' {
+  const buffer = Buffer.alloc(4);
+  const fd = fs.openSync(filePath, 'r');
+  fs.readSync(fd, buffer, 0, 4, 0);
+  fs.closeSync(fd);
+
+  // Check for LZ4 magic bytes: 0x04 0x22 0x4D 0x18
+  if (
+    buffer[0] === 0x04 &&
+    buffer[1] === 0x22 &&
+    buffer[2] === 0x4d &&
+    buffer[3] === 0x18
+  ) {
+    return 'lz4';
+  }
+
+  // Check for gzip magic bytes: 0x1F 0x8B
+  if (buffer[0] === 0x1f && buffer[1] === 0x8b) {
+    return 'gzip';
+  }
+
+  // Default to gzip if unknown
+  core.warning('Unknown compression format, defaulting to gzip');
+  return 'gzip';
 }
 
 /**
@@ -105,12 +141,22 @@ export async function extractTarArchive(
     fs.mkdirSync(targetDir, { recursive: true });
   }
 
-  // Detect compression type from file
-  let compressionCmd = 'lz4 -d';
-  try {
-    await exec.exec('which', ['lz4'], { silent: true });
-  } catch {
-    core.warning('lz4 not found, assuming gzip compression');
+  // Detect compression type from file magic bytes
+  const compressionFormat = detectCompressionFormat(archivePath);
+  core.info(`Detected compression format: ${compressionFormat}`);
+
+  let compressionCmd: string;
+  if (compressionFormat === 'lz4') {
+    // Verify lz4 is available
+    try {
+      await exec.exec('which', ['lz4'], { silent: true });
+      compressionCmd = 'lz4 -d';
+    } catch {
+      throw new Error(
+        'Archive is LZ4 compressed but lz4 command not found. Please install lz4.'
+      );
+    }
+  } else {
     compressionCmd = 'gzip -d';
   }
 
@@ -155,7 +201,7 @@ export function buildCacheKey(keyTemplate: string): string {
   // Build the full cache key: <org>/<repo>/<branch>/<workflow>/<user-key>
   const cacheKey = `${org}/${repo}/${branch}/${workflow}/${key}`;
 
-  // Add .tar.lz4 extension (or .tar.gz if using gzip)
+  // Add .tar.lz4 extension (used for both lz4 and gzip - actual format is detected from magic bytes on restore)
   return `${cacheKey}.tar.lz4`;
 }
 

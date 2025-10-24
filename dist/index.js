@@ -57498,6 +57498,7 @@ function getTempDir() {
 /**
  * Create a tar archive from paths
  * Uses lz4 compression via tar's --use-compress-program option
+ * Returns the compression format used
  */
 async function createTarArchive(paths, outputPath, workingDir = process.cwd()) {
     core.info(`Creating tar archive: ${outputPath}`);
@@ -57508,12 +57509,15 @@ async function createTarArchive(paths, outputPath, workingDir = process.cwd()) {
     try {
         // Use lz4 if available, otherwise fall back to gzip
         let compressionCmd = 'lz4 -c';
+        let compressionFormat = 'lz4';
         try {
             await exec.exec('which', ['lz4'], { silent: true });
+            core.info('Using lz4 compression');
         }
         catch {
-            core.warning('lz4 not found, falling back to gzip compression');
+            core.info('lz4 not found, using gzip compression');
             compressionCmd = 'gzip';
+            compressionFormat = 'gzip';
         }
         // Create tar archive with compression
         // Note: Options like --no-recursion must come before positional arguments
@@ -57534,6 +57538,8 @@ async function createTarArchive(paths, outputPath, workingDir = process.cwd()) {
         }
         const stats = fs.statSync(outputPath);
         core.info(`Archive created: ${(stats.size / 1024 / 1024).toFixed(2)} MB`);
+        core.info(`Compression format: ${compressionFormat}`);
+        return compressionFormat;
     }
     finally {
         // Clean up file list
@@ -57541,6 +57547,29 @@ async function createTarArchive(paths, outputPath, workingDir = process.cwd()) {
             fs.unlinkSync(fileListPath);
         }
     }
+}
+/**
+ * Detect compression format from file magic bytes
+ */
+function detectCompressionFormat(filePath) {
+    const buffer = Buffer.alloc(4);
+    const fd = fs.openSync(filePath, 'r');
+    fs.readSync(fd, buffer, 0, 4, 0);
+    fs.closeSync(fd);
+    // Check for LZ4 magic bytes: 0x04 0x22 0x4D 0x18
+    if (buffer[0] === 0x04 &&
+        buffer[1] === 0x22 &&
+        buffer[2] === 0x4d &&
+        buffer[3] === 0x18) {
+        return 'lz4';
+    }
+    // Check for gzip magic bytes: 0x1F 0x8B
+    if (buffer[0] === 0x1f && buffer[1] === 0x8b) {
+        return 'gzip';
+    }
+    // Default to gzip if unknown
+    core.warning('Unknown compression format, defaulting to gzip');
+    return 'gzip';
 }
 /**
  * Extract a tar archive
@@ -57551,13 +57580,21 @@ async function extractTarArchive(archivePath, targetDir) {
     if (!fs.existsSync(targetDir)) {
         fs.mkdirSync(targetDir, { recursive: true });
     }
-    // Detect compression type from file
-    let compressionCmd = 'lz4 -d';
-    try {
-        await exec.exec('which', ['lz4'], { silent: true });
+    // Detect compression type from file magic bytes
+    const compressionFormat = detectCompressionFormat(archivePath);
+    core.info(`Detected compression format: ${compressionFormat}`);
+    let compressionCmd;
+    if (compressionFormat === 'lz4') {
+        // Verify lz4 is available
+        try {
+            await exec.exec('which', ['lz4'], { silent: true });
+            compressionCmd = 'lz4 -d';
+        }
+        catch {
+            throw new Error('Archive is LZ4 compressed but lz4 command not found. Please install lz4.');
+        }
     }
-    catch {
-        core.warning('lz4 not found, assuming gzip compression');
+    else {
         compressionCmd = 'gzip -d';
     }
     const exitCode = await exec.exec('tar', [
@@ -57591,7 +57628,7 @@ function buildCacheKey(keyTemplate) {
         .replace(/\$\{\{\s*github\.workflow\s*\}\}/g, workflow);
     // Build the full cache key: <org>/<repo>/<branch>/<workflow>/<user-key>
     const cacheKey = `${org}/${repo}/${branch}/${workflow}/${key}`;
-    // Add .tar.lz4 extension (or .tar.gz if using gzip)
+    // Add .tar.lz4 extension (used for both lz4 and gzip - actual format is detected from magic bytes on restore)
     return `${cacheKey}.tar.lz4`;
 }
 /**
@@ -58331,12 +58368,15 @@ async function saveCache(inputs) {
             // Save manifest to working directory temporarily
             const manifestPath = (0, manifest_1.saveManifest)(manifest, workingDir);
             const manifestRelativePath = path.relative(workingDir, manifestPath);
+            // Convert all paths to relative paths (glob returns absolute paths)
+            const relativePaths = existingPaths.map(p => path.isAbsolute(p) ? path.relative(workingDir, p) : p);
             // Add manifest to the list of files to archive
-            const allPaths = [...existingPaths, manifestRelativePath];
+            const allPaths = [...relativePaths, manifestRelativePath];
             // Create tar archive
             const archivePath = path.join(tempDir, path.basename(cacheKey));
+            let compressionFormat;
             try {
-                await (0, cache_1.createTarArchive)(allPaths, archivePath, workingDir);
+                compressionFormat = await (0, cache_1.createTarArchive)(allPaths, archivePath, workingDir);
             }
             finally {
                 // Clean up manifest from working directory
@@ -58360,6 +58400,7 @@ async function saveCache(inputs) {
             core.info('');
             core.info('Cache saved successfully!');
             core.info(`  Size: ${sizeMB} MB`);
+            core.info(`  Compression: ${compressionFormat}`);
             core.info(`  Duration: ${duration}s`);
             core.info(`  Paths cached: ${existingPaths.length}`);
         }

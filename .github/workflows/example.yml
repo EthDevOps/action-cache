@@ -28,9 +28,6 @@ jobs:
         with:
           action: restore
           key: ${{ runner.os }}-node-${{ hashFiles('**/package-lock.json') }}
-          restore-keys: |
-            ${{ runner.os }}-node-
-            ${{ runner.os }}-
           path: node_modules
           cache-username: ${{ secrets.CACHE_USER }}
           cache-password: ${{ secrets.CACHE_PASSWORD }}

@@ -65,14 +65,20 @@ export async function saveCache(inputs: ActionInputs): Promise<void> {
       const manifestPath = saveManifest(manifest, workingDir);
       const manifestRelativePath = path.relative(workingDir, manifestPath);
 
+      // Convert all paths to relative paths (glob returns absolute paths)
+      const relativePaths = existingPaths.map(p =>
+        path.isAbsolute(p) ? path.relative(workingDir, p) : p
+      );
+
       // Add manifest to the list of files to archive
-      const allPaths = [...existingPaths, manifestRelativePath];
+      const allPaths = [...relativePaths, manifestRelativePath];
 
       // Create tar archive
       const archivePath = path.join(tempDir, path.basename(cacheKey));
 
+      let compressionFormat: 'lz4' | 'gzip';
       try {
-        await createTarArchive(allPaths, archivePath, workingDir);
+        compressionFormat = await createTarArchive(allPaths, archivePath, workingDir);
       } finally {
         // Clean up manifest from working directory
         if (fs.existsSync(manifestPath)) {
@@ -106,6 +112,7 @@ export async function saveCache(inputs: ActionInputs): Promise<void> {
       core.info('');
       core.info('Cache saved successfully!');
       core.info(`  Size: ${sizeMB} MB`);
+      core.info(`  Compression: ${compressionFormat}`);
       core.info(`  Duration: ${duration}s`);
       core.info(`  Paths cached: ${existingPaths.length}`);
     } finally {
