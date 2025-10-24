@@ -17,7 +17,7 @@ A GitHub Action for caching dependencies and build outputs to S3-compatible stor
 
 ```yaml
 - name: Save cache
-  uses: your-org/s3-cache-action@v1
+  uses: EthDevOps/action-cache@v1
   with:
     action: save
     key: ${{ runner.os }}-node-${{ hashFiles('**/package-lock.json') }}
@@ -32,7 +32,7 @@ A GitHub Action for caching dependencies and build outputs to S3-compatible stor
 
 ```yaml
 - name: Restore cache
-  uses: your-org/s3-cache-action@v1
+  uses: EthDevOps/action-cache@v1
   with:
     action: restore
     key: ${{ runner.os }}-node-${{ hashFiles('**/package-lock.json') }}
@@ -70,7 +70,7 @@ jobs:
 
       - name: Restore cache
         id: cache
-        uses: your-org/s3-cache-action@v1
+        uses: EthDevOps/action-cache@v1
         with:
           action: restore
           key: ${{ runner.os }}-node-${{ hashFiles('**/package-lock.json') }}
@@ -92,7 +92,7 @@ jobs:
 
       - name: Save cache
         if: always()
-        uses: your-org/s3-cache-action@v1
+        uses: EthDevOps/action-cache@v1
         with:
           action: save
           key: ${{ runner.os }}-node-${{ hashFiles('**/package-lock.json') }}
@@ -228,6 +228,32 @@ Add the action to your workflow as shown in the examples above.
 - If LZ4 is not available, the action will fall back to gzip
 - Install LZ4 in your runner if you need optimal compression speed
 
+## Development
+
+### Building the Action
+
+This action is written in TypeScript and must be compiled before use:
+
+```bash
+# Install dependencies
+npm install
+
+# Build the action
+npm run build
+```
+
+### Important: Committing Changes
+
+**The `dist/` directory must be committed to the repository!** GitHub Actions cannot run TypeScript directly - they need the compiled JavaScript.
+
+After making changes:
+1. Make your code changes in `src/`
+2. Run `npm run build` to compile
+3. **Commit both `src/` and `dist/` changes**
+4. Push to GitHub
+
+The `dist/` directory contains the bundled action code (~2.2MB) that GitHub Actions will execute.
+
 ## License
 
 MIT
@@ -235,3 +261,9 @@ MIT
 ## Contributing
 
 Contributions are welcome! Please open an issue or submit a pull request.
+
+When contributing:
+1. Make changes in the `src/` directory
+2. Run `npm run build` to compile
+3. Commit both source and compiled code
+4. Submit a pull request

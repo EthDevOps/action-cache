@@ -13,7 +13,7 @@
   },
   "repository": {
     "type": "git",
-    "url": "git+https://github.com/your-org/s3-cache-action.git"
+    "url": "git+https://github.com/EthDevOps/action-cache.git"
   },
   "keywords": [
     "actions",

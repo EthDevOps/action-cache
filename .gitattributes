@@ -1,0 +1,9 @@
+# Normalize line endings for all files
+* text=auto
+
+# Force LF for shell scripts
+*.sh text eol=lf
+
+# Force LF for compiled JavaScript (GitHub Actions requirement)
+dist/** linguist-generated=true
+dist/*.js text eol=lf
