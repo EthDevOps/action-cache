@@ -57516,15 +57516,16 @@ async function createTarArchive(paths, outputPath, workingDir = process.cwd()) {
             compressionCmd = 'gzip';
         }
         // Create tar archive with compression
+        // Note: Options like --no-recursion must come before positional arguments
         const exitCode = await exec.exec('tar', [
-            '-cf',
-            outputPath,
-            `--use-compress-program=${compressionCmd}`,
+            '--no-recursion',
             '-C',
             workingDir,
+            `--use-compress-program=${compressionCmd}`,
+            '-cf',
+            outputPath,
             '--files-from',
-            fileListPath,
-            '--no-recursion' // We already have all files from glob
+            fileListPath
         ], {
             silent: false
         });
@@ -57560,11 +57561,11 @@ async function extractTarArchive(archivePath, targetDir) {
         compressionCmd = 'gzip -d';
     }
     const exitCode = await exec.exec('tar', [
-        '-xf',
-        archivePath,
-        `--use-compress-program=${compressionCmd}`,
         '-C',
-        targetDir
+        targetDir,
+        `--use-compress-program=${compressionCmd}`,
+        '-xf',
+        archivePath
     ], {
         silent: false
     });
