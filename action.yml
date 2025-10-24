@@ -1,6 +1,6 @@
-name: 'S3 Cache'
+name: 'S3-based Cache'
 description: 'Cache dependencies and build outputs to S3/Minio'
-author: 'Your Organization'
+author: 'EthQuokkaOps'
 
 branding:
   icon: 'archive'
